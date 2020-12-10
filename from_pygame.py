@@ -1,15 +1,19 @@
 import pygame
+import json
 from pygame import *
-
 from Camera import *
+
+pygame.init()
+
+with open("game_data/sprite_map.json") as file:
+	sprite_map = json.load(file)
+with open("game_data/levels.json") as file:
+	levels = json.load(file)
 
 screen_stat = {
 	"width": 10,
-	"height": 10
-}
-tile = {
-	"size": 48,
-	"color": "#9A6C1A"
+	"height": 10,
+	"tile": 48
 }
 player_stat = {
 	"x": 100,
@@ -20,21 +24,12 @@ player_stat = {
 	"dx": 0,
 	"dy": 0,
 	"ddy": 0.35,
-	"width":  int(tile["size"]/2),
-	"height": int(tile["size"]*4/5),
+	"width":  int(screen_stat["tile"]/2),
+	"height": int(screen_stat["tile"]*4/5),
 	"color": "#00FF19"
 }
+active_level = 0
 
-player = sprite.Sprite()
-player.image = Surface((player_stat["width"], player_stat["height"]))
-player.image.fill(Color(player_stat["color"]))
-# player.image = image.load("pygame_files/") # 24, 38
-# player_stand.png
-player.image = image.load("pygame_files/player/PNG/Player/Poses/player_stand_scaled.png")
-
-player.rect = Rect(player_stat["x"], player_stat["y"], player_stat["width"], player_stat["height"])
-
-timer = pygame.time.Clock()
 
 def collisions_obstacles(_dx, _dy, _obstacles):
 	global player_stat, player
@@ -54,7 +49,7 @@ def collisions_obstacles(_dx, _dy, _obstacles):
 				player_stat["dy"] = 0
 
 def collisions_interact(_interact):
-	global level
+	global level, active_level, level_begin, player
 
 	for i in _interact:
 		if sprite.collide_rect(player, i["sprite"]):
@@ -70,7 +65,20 @@ def collisions_interact(_interact):
 						level[l] = level[l][:z] + "D" + level[l][z+1:]
 
 			if key == "D":
-				print("Next level!")
+				if active_level+1 >= len(levels):
+					print("end game!")
+				else:
+					active_level += 1
+					level = levels[active_level]
+					level_begin = True
+
+			if key == "W":
+				level_begin = True
+			if key == "s":
+				player.rect.height = int(player.rect.height / 4)
+				player.rect.width  = int(player.rect.width  / 4)
+				player.image = pygame.transform.scale(player.image, (player.rect.width, player.rect.height))
+				level[n] = level[n][:m] + " " + level[n][m+1:]
 
 
 def player_move(left, right, jump, _obstacles, _interact):
@@ -98,9 +106,16 @@ def player_move(left, right, jump, _obstacles, _interact):
 
 	collisions_interact(_interact)
 
-DISPLAY = (screen_stat["width"]*tile["size"], screen_stat["height"]*tile["size"])
 
-pygame.init()
+player = sprite.Sprite()
+player.image = Surface((player_stat["width"], player_stat["height"]))
+player.image.fill(Color(player_stat["color"]))
+player.image = image.load(sprite_map["player"])
+
+# player.rect = Rect(player_stat["x"], player_stat["y"], player_stat["width"], player_stat["height"])
+player.rect = Rect(0, 0, player_stat["width"], player_stat["height"])
+
+DISPLAY = (screen_stat["width"]*screen_stat["tile"], screen_stat["height"]*screen_stat["tile"])
 
 screen = pygame.display.set_mode(DISPLAY)
 pygame.display.set_caption("Test game")
@@ -108,54 +123,15 @@ pygame.display.set_caption("Test game")
 background = Surface(DISPLAY)
 background.fill(Color("#ffffff"))
 
-level = [
-	"3___________2",
-	"7           |",
-	"7           |",
-	"7      k    |",
-	"7      TT   |",
-	"7           |",
-	"7    TT     |",
-	"7           |",
-	"7  TT       |",
-	"7      TT   |",
-	"7    TT     |",
-	"7  TT       |",
-	"7         d |",
-	"1TTTTTTTTTTT0"
-]
+obstacles_sprites = sprite_map["obstacles"]
+interact_sprites  = sprite_map["interact"]
 
-obstacles_sprites = {
-	"0": "pygame_files/surface/PNG/Tiles/tile25.png",
-	"1": "pygame_files/surface/PNG/Tiles/tile26.png",
-	"2": "pygame_files/surface/PNG/Tiles/tile26_rev.png",
-	"3": "pygame_files/surface/PNG/Tiles/tile25_rev.png",
-	"7": "pygame_files/surface/PNG/Tiles/tile88.png",
-	"_": "pygame_files/surface/PNG/Tiles/tile32_rev.png",
-	"|": "pygame_files/surface/PNG/Tiles/tile90.png",
-	"T": "pygame_files/surface/PNG/Tiles/tile32.png"
-}
-interact_sprites = {
-	"d": {
-		"w": 48,
-		"h": 48,
-		"sprite": "pygame_files/door_lock.png"
-	},
-	"D": {
-		"w": 48,
-		"h": 48,
-		"sprite": "pygame_files/door_open.png"
-	},
-	"k": {
-		"w": 26,
-		"h": 26,
-		"sprite": "pygame_files/key.png"
-	}
-}
-
-camera = Camera(camera_configure, len(level[0])*tile["size"], len(level)*tile["size"])
-
+level = levels[active_level].copy()
+camera = Camera(camera_configure, len(level[0])*screen_stat["tile"], len(level)*screen_stat["tile"])
+timer = pygame.time.Clock()
 left = right = jump = False
+level_begin = True
+
 
 while 1:
 	timer.tick(60)
@@ -183,17 +159,24 @@ while 1:
 	obstacles = []
 	interact = []
 	
+	if level_begin:
+		level = levels[active_level].copy()
+
 	for y in range(len(level)):
 		for x in range(len(level[y])):
+			coordX = x*screen_stat["tile"]
+			coordY = y*screen_stat["tile"]
+
 			if level[y][x] in obstacles_sprites or level[y][x] in interact_sprites:
 				tile_sprite = sprite.Sprite()
+
 				if level[y][x] in obstacles_sprites:
 					tile_sprite.image = image.load(obstacles_sprites[level[y][x]])
 					tile_sprite.rect = Rect(
-						x*tile["size"],
-						y*tile["size"],
-						tile["size"],
-						tile["size"]
+						coordX,
+						coordY,
+						screen_stat["tile"],
+						screen_stat["tile"]
 					)
 
 					obstacles.append(tile_sprite)
@@ -202,11 +185,14 @@ while 1:
 					io = interact_sprites[level[y][x]]
 					tile_sprite.image = image.load(io["sprite"])
 					tile_sprite.rect = Rect(
-						x*tile["size"] + int((tile["size"]-io["w"])/2),
-						y*tile["size"] + int((tile["size"]-io["h"])/2),
+						coordX + int((screen_stat["tile"]-io["w"])/2),
+						coordY + int((screen_stat["tile"]-io["h"])/2),
 						io["w"],
 						io["h"]
 					)
+					if "draw_at" in io:
+						if io["draw_at"] == "bottom":
+							tile_sprite.rect.y = coordY + screen_stat["tile"] - io["h"]
 
 					interact.append({
 						"sprite": tile_sprite,
@@ -214,12 +200,21 @@ while 1:
 						"y": y
 					})
 
-				objects.add(tile_sprite)			
+				objects.add(tile_sprite)
+
+			if level_begin and level[y][x] == "p":
+				player.rect.left = coordX
+				player.rect.top  = coordY
+				player.rect.width  = player_stat["width"]
+				player.rect.height = player_stat["height"]
+				player.image = image.load(sprite_map["player"])
+
+				level_begin = False		
 
 	objects.add(player)
 	player_move(left, right, jump, obstacles, interact)
 
-	camera.update(player, screen_stat["width"]*tile["size"], screen_stat["height"]*tile["size"])
+	camera.update(player, screen_stat["width"]*screen_stat["tile"], screen_stat["height"]*screen_stat["tile"])
 	for obj in objects:
 		screen.blit(obj.image, camera.apply(obj))
 
