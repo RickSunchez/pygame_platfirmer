@@ -127,10 +127,10 @@ obstacles_sprites = sprite_map["obstacles"]
 interact_sprites  = sprite_map["interact"]
 
 level = levels[active_level].copy()
-camera = Camera(camera_configure, len(level[0])*screen_stat["tile"], len(level)*screen_stat["tile"])
 timer = pygame.time.Clock()
 left = right = jump = False
 level_begin = True
+camera = Camera(camera_configure)
 
 
 while 1:
@@ -161,6 +161,7 @@ while 1:
 	
 	if level_begin:
 		level = levels[active_level].copy()
+		camera.size(len(level[0])*screen_stat["tile"], len(level)*screen_stat["tile"])
 
 	for y in range(len(level)):
 		for x in range(len(level[y])):
